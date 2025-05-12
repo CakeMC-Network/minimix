@@ -10,28 +10,28 @@ import java.lang.reflect.Method
 import java.net.URLClassLoader
 
 /**
- * A custom class loader capable of applying mixin transformations to Java classes at load time.
+ * A custom class loader capable of applying minimix transformations to Java classes at load time.
  *
- * Mixins allow modification of existing classes without directly modifying their source code.
+ * MiniMixs allow modification of existing classes without directly modifying their source code.
  * This class loader supports:
- * - Adding methods and fields from mixins.
+ * - Adding methods and fields from minimixs.
  * - Replacing or injecting code into existing methods using annotations.
  * - Shadowing fields for field redirection.
  *
- * @property mixinClassNames The fully-qualified class names of mixin classes to load and apply.
+ * @property minimixClassNames The fully-qualified class names of minimix classes to load and apply.
  * @property dependencies A list of dependencies in string format to be resolved and loaded.
  * @property repositories Repositories used by [DependencyManager] to resolve dependencies.
- * @constructor Loads dependencies, reads mixins, and prepares them for transformation.
+ * @constructor Loads dependencies, reads minimixs, and prepares them for transformation.
  */
-class MixinClassLoader(
-    private val mixinClassNames: List<String>,
+class MinimixClassLoader(
+    private val minimixClassNames: List<String>,
     private val dependencies: List<String> = listOf(),
-    private val repositories: List<Repository>,
+    private val repositories: List<Repository> = listOf(),
     parent: ClassLoader = getSystemClassLoader()
 ) : ClassLoader(parent) {
 
-    /** Map of target class names to their associated mixin nodes and class references */
-    private val mixins: Map<String, List<Pair<ClassNode, Class<*>>>>
+    /** Map of target class names to their associated minimix nodes and class references */
+    private val minimixs: Map<String, List<Pair<ClassNode, Class<*>>>>
 
     /** Handles parsing and downloading of dependencies */
     private val dependencyManager = DependencyManager(repositories)
@@ -47,10 +47,10 @@ class MixinClassLoader(
             addJarToClasspath(jarFile)
         }
 
-        mixins = mixinClassNames
+        minimixs = minimixClassNames
             .mapNotNull { name ->
                 val cls = parent.loadClass(name)
-                val target = cls.getAnnotation(MixinTarget::class.java)?.value ?: return@mapNotNull null
+                val target = cls.getAnnotation(MiniMixTarget::class.java)?.value ?: return@mapNotNull null
                 val classNode = readClassNode(name) ?: return@mapNotNull null
                 target to (classNode to cls)
             }
@@ -69,14 +69,14 @@ class MixinClassLoader(
     }
 
     /**
-     * Finds and defines a class, applying mixin transformations if available.
+     * Finds and defines a class, applying minimix transformations if available.
      *
      * @param name The fully-qualified class name.
      * @return The defined class.
      */
     override fun findClass(name: String): Class<*> {
         val originalBytes = loadBytes(name)
-        val transformed = mixins[name]?.let { applyMixins(name, originalBytes, it) } ?: originalBytes
+        val transformed = minimixs[name]?.let { applyMiniMixs(name, originalBytes, it) } ?: originalBytes
         return defineClass(name, transformed, 0, transformed.size)
     }
 
@@ -109,14 +109,14 @@ class MixinClassLoader(
     }
 
     /**
-     * Applies all mixins to the target class.
+     * Applies all minimixs to the target class.
      *
      * @param targetClassName Name of the class being transformed.
      * @param originalBytes Original class bytecode.
-     * @param mixins List of mixin class nodes and classes to apply.
+     * @param minimixs List of minimix class nodes and classes to apply.
      * @return Transformed bytecode.
      */
-    private fun applyMixins(targetClassName: String, originalBytes: ByteArray, mixins: List<Pair<ClassNode, Class<*>>>): ByteArray {
+    private fun applyMiniMixs(targetClassName: String, originalBytes: ByteArray, minimixs: List<Pair<ClassNode, Class<*>>>): ByteArray {
         val reader = ClassReader(originalBytes)
         val writer = ClassWriter(reader, ClassWriter.COMPUTE_FRAMES or ClassWriter.COMPUTE_MAXS)
         val targetNode = ClassNode()
@@ -125,21 +125,21 @@ class MixinClassLoader(
         val existingMethods = targetNode.methods.map { it.name + it.desc }.toMutableSet()
         val existingFields = targetNode.fields.map { it.name }.toMutableSet()
 
-        for ((mixinNode, mixinClass) in mixins) {
-            val methodMap = mixinClass.declaredMethods.associateBy { it.name }
+        for ((minimixNode, minimixClass) in minimixs) {
+            val methodMap = minimixClass.declaredMethods.associateBy { it.name }
 
-            val shadowFields = mixinClass.declaredFields
-                .filter { it.isAnnotationPresent(MixinShadow::class.java) }
+            val shadowFields = minimixClass.declaredFields
+                .filter { it.isAnnotationPresent(MiniMixShadow::class.java) }
                 .associate {
-                    val ann = it.getAnnotation(MixinShadow::class.java)
+                    val ann = it.getAnnotation(MiniMixShadow::class.java)
                     val shadowName = ann.name.takeIf { n -> n.isNotBlank() } ?: it.name
                     it.name to shadowName
                 }
 
             // === Handle Interfaces ===
-            val interfaces = mixinClass.interfaces.map { it.name }
+            val interfaces = minimixClass.interfaces.map { it.name }
             if (targetNode.interfaces.any { interfaces.contains(it) }) {
-                injectMixinMethods(targetNode, mixinNode, mixinClass, methodMap, shadowFields, existingMethods, existingFields)
+                injectMiniMixMethods(targetNode, minimixNode, minimixClass, methodMap, shadowFields, existingMethods, existingFields)
             }
 
             // === Handle Class Hierarchy ===
@@ -152,7 +152,7 @@ class MixinClassLoader(
             }
 
             targetClassesToProcess.forEach { classNode ->
-                injectMixinMethods(classNode, mixinNode, mixinClass, methodMap, shadowFields, existingMethods, existingFields)
+                injectMiniMixMethods(classNode, minimixNode, minimixClass, methodMap, shadowFields, existingMethods, existingFields)
             }
         }
 
@@ -161,20 +161,20 @@ class MixinClassLoader(
     }
 
     /**
-     * Injects methods and fields from a mixin into a target class node.
+     * Injects methods and fields from a minimix into a target class node.
      */
-    private fun injectMixinMethods(
+    private fun injectMiniMixMethods(
         targetNode: ClassNode,
-        mixinNode: ClassNode,
-        mixinClass: Class<*>,
+        minimixNode: ClassNode,
+        minimixClass: Class<*>,
         methodMap: Map<String, Method>,
         shadowFields: Map<String, String>,
         existingMethods: MutableSet<String>,
         existingFields: MutableSet<String>
     ) {
         // === Inject fields ===
-        for (field in mixinNode.fields) {
-            val ann = mixinClass.declaredFields.find { it.name == field.name }?.getAnnotation(MixinField::class.java)
+        for (field in minimixNode.fields) {
+            val ann = minimixClass.declaredFields.find { it.name == field.name }?.getAnnotation(MiniMixField::class.java)
             val name = ann?.name?.takeIf { it.isNotBlank() } ?: field.name
             if (name !in existingFields) {
                 targetNode.fields.add(FieldNode(field.access, name, field.desc, field.signature, field.value))
@@ -183,17 +183,17 @@ class MixinClassLoader(
         }
 
         // === Inject methods ===
-        for (method in mixinNode.methods) {
+        for (method in minimixNode.methods) {
             if (method.name == "<init>") continue  // Skip constructors
 
             val reflectMethod = methodMap[method.name] ?: continue
 
-            // Check if the method has @MixinMethod to replace it
-            val mixinAnn = reflectMethod.getAnnotation(MixinMethod::class.java)
-            if (mixinAnn != null) {
-                val name = mixinAnn.name.takeIf { it.isNotBlank() } ?: method.name
+            // Check if the method has @MiniMixMethod to replace it
+            val minimixAnn = reflectMethod.getAnnotation(MiniMixMethod::class.java)
+            if (minimixAnn != null) {
+                val name = minimixAnn.name.takeIf { it.isNotBlank() } ?: method.name
                 val key = name + method.desc
-                if (mixinAnn.replace) {
+                if (minimixAnn.replace) {
                     // Remove the existing method with the same signature
                     targetNode.methods.removeIf { it.name + it.desc == key }
                     targetNode.methods.add(cloneMethod(method, name))
@@ -206,14 +206,14 @@ class MixinClassLoader(
             }
 
             // Otherwise, it's an injection point
-            val injectAnn = reflectMethod.getAnnotation(MixinInject::class.java) ?: continue
+            val injectAnn = reflectMethod.getAnnotation(MiniMixInject::class.java) ?: continue
             val injectTarget = targetNode.methods.find {
                 it.name == injectAnn.methodName && it.desc == injectAnn.methodDesc
             } ?: continue
 
             val remappedInsns = remapFieldAccess(
                 method.instructions,
-                mixinInternalName = mixinNode.name,
+                minimixInternalName = minimixNode.name,
                 targetInternalName = targetNode.name,
                 shadowMap = shadowFields
             )
@@ -239,10 +239,10 @@ class MixinClassLoader(
     }
 
     /**
-     * Finds a class node among loaded mixin class nodes.
+     * Finds a class node among loaded minimix class nodes.
      */
     private fun findClassNodeByName(className: String): ClassNode? {
-        return mixins.values.flatMap { it.map { it.first } }
+        return minimixs.values.flatMap { it.map { it.first } }
             .find { it.name == className }
     }
 
@@ -268,11 +268,11 @@ class MixinClassLoader(
     }
 
     /**
-     * Rewrites field accesses in instructions from mixin to target class, applying shadow field mappings.
+     * Rewrites field accesses in instructions from minimix to target class, applying shadow field mappings.
      */
     private fun remapFieldAccess(
         original: InsnList,
-        mixinInternalName: String,
+        minimixInternalName: String,
         targetInternalName: String,
         shadowMap: Map<String, String>
     ): InsnList {
@@ -281,7 +281,7 @@ class MixinClassLoader(
 
         while (iter.hasNext()) {
             val insn = iter.next()
-            if (insn is FieldInsnNode && insn.owner == mixinInternalName) {
+            if (insn is FieldInsnNode && insn.owner == minimixInternalName) {
                 val shadowName = shadowMap[insn.name]
                 if (shadowName != null) {
                     newList.add(FieldInsnNode(insn.opcode, targetInternalName, shadowName, insn.desc))

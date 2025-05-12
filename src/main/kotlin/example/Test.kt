@@ -1,11 +1,11 @@
 package example
 
-import net.cakemc.minimix.MixinClassLoader
+import net.cakemc.minimix.MinimixClassLoader
 
 // Main.kt
 fun main() {
-    // Initialize the MixinClassLoader with the Mixin class names to be applied
-    val loader = MixinClassLoader(listOf("example.MyMixin"))
+    // Initialize the MiniMixClassLoader with the Minimix class names to be applied
+    val loader = MinimixClassLoader(listOf("example.MyMiniMix"))
 
     // Dynamically load the target class
     val clazz = loader.loadClass("example.MyTarget")
@@ -13,15 +13,15 @@ fun main() {
     // Instantiate the target class
     val obj = clazz.getDeclaredConstructor().newInstance() as Tickable
 
-    // Show the original behavior before any mixins
-    println("=== Before Mixin ===")
+    // Show the original behavior before any minimix
+    println("=== Before ===")
     obj.tick()
 
-    // Dynamically invoke the method that was replaced by the mixin
-    println("=== After Mixin ===")
-    obj.tick()  // This will use the mixin's `tick()` method
+    // Dynamically invoke the method that was replaced by the minimix
+    println("=== After ===")
+    obj.tick()  // This will use the minimix's `tick()` method
 
-    // The mixin should have also replaced the `increaseCount()` method
+    // The minimix should have also replaced the `increaseCount()` method
     val increaseMethod = clazz.getMethod("increaseCount")
     increaseMethod.invoke(obj)
 }

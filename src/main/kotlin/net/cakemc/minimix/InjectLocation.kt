@@ -1,9 +1,9 @@
 package net.cakemc.minimix
 
 /**
- * Represents the location within a method where mixin code should be injected.
+ * Represents the location within a method where minimix code should be injected.
  *
- * Used in conjunction with the [MixinInject] annotation to determine where
+ * Used in conjunction with the [MiniMixInject] annotation to determine where
  * in the target method the instructions from the mixin method will be inserted.
  */
 enum class InjectLocation {

@@ -1,6 +1,6 @@
 package net.cakemc.minimix.wrapper
 
-import net.cakemc.minimix.MixinClassLoader
+import net.cakemc.minimix.MinimixClassLoader
 import net.cakemc.minimix.dependency.Repository
 
 object LaunchWrapper {
@@ -26,14 +26,14 @@ object LaunchWrapper {
             // Add more deps as needed
         )
 
-        val mixins = listOf(
-            "com.example.mixin.MyMixin",
+        val minimixs = listOf(
+            "com.example.MyMiniMix",
         )
 
-        val mixinLoader = MixinClassLoader(mixins, dependencies, repositories)
-        Thread.currentThread().contextClassLoader = mixinLoader
+        val minimixLoader = MinimixClassLoader(minimixs, dependencies, repositories)
+        Thread.currentThread().contextClassLoader = minimixLoader
 
-        val mainClass = mixinLoader.loadClass(mainClassName)
+        val mainClass = minimixLoader.loadClass(mainClassName)
         val mainMethod = mainClass.getMethod("main", Array<String>::class.java)
         mainMethod.invoke(null, appArgs)
     }
